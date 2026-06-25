@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Y to T Calculator</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; color: #333; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; margin-top: 20px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { margin-top: 25px; padding: 15px; border-radius: 4px; display: none; background: #f8f9fa; border: 1px solid #e9ecef; }
+        .match-card { border-left: 4px solid #28a745; padding-left: 15px; margin-bottom: 20px; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Y-Value Solver & Generator</h2>
+    <p>Enter your target parameters to find matching <strong>t</strong> values.</p>
+
+    <label for="start_t">Start T:</label>
+    <input type="number" id="start_t" value="659">
+
+    <label for="y1">Observed Y1:</label>
+    <input type="number" id="y1" value="16147639">
+
+    <label for="y2">Observed Y2:</label>
+    <input type="number" id="y2" value="16216751">
+
+    <button onclick="runSearch()">Find T and Calculate Curve</button>
+
+    <div id="results"></div>
+
+    <script>
+        // Standard normal cumulative distribution function (approximation of NORM.DIST)
+        function stdNormCDF(x) {
+            const t = 1 / (1 + 0.2316419 * Math.abs(x));
+            const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+            const p = d * t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+            return x >= 0 ? 1 - p : p;
+        }
+
+        function normCDF(x, mean, stdDev) {
+            return stdNormCDF((x - mean) / stdDev);
+        }
+
+        function calculateY(t, x, norm600, norm1400) {
+            const baseVal = 1995587;
+            const tMod = Math.floor((t - 481) / 49);
+            
+            if (x <= 599) {
+                const y600 = baseVal + (16058300 + 100 * t - baseVal) * norm600;
+                const slopeB = 248.831 + tMod * 0.07619047619;
+                return y600 - (600 - x) * slopeB;
+            } else if (x >= 1401) {
+                const y1400 = baseVal + (16058300 + 100 * t - baseVal) * norm1400;
+                const slopeT = 220.605 + tMod * 0.0670995671;
+                return y1400 + (x - 1400) * slopeT;
+            } else {
+                const normDist = normCDF(x, 1000, 110);
+                return baseVal + (16058300 + 100 * t - baseVal) * normDist;
+            }
+        }
+
+        function runSearch() {
+            const startT = parseInt(document.getElementById('start_t').value);
+            const observedYs = [parseFloat(document.getElementById('y1').value), parseFloat(document.getElementById('y2').value)];
+            const tolerance = 1.5;
+            const maxSteps = 5000;
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = "Searching...";
+
+            // Pre-calculate boundaries
+            const norm600 = normCDF(600, 1000, 110);
+            const norm1400 = normCDF(1400, 1000, 110);
+
+            // Generate inward-out T sequence
+            let tSequence = [startT];
+            for (let step = 1; step <= maxSteps; step++) {
+                tSequence.push(startT + step);
+                tSequence.push(startT - step);
+            }
+
+            let matches = [];
+
+            // Loop through T values
+            for (let t of tSequence) {
+                let matchedObserved = new Set();
+                
+                // Scan X from 100 to 2200
+                for (let x = 100; x <= 2200; x++) {
+                    let yCalc = calculateY(t, x, norm600, norm1400);
+                    
+                    for (let i = 0; i < observedYs.length; i++) {
+                        if (Math.abs(yCalc - observedYs[i]) <= tolerance) {
+                            matchedObserved.add(i);
+                        }
+                    }
+                }
+
+                // If all observed Ys found a match for this T
+                if (matchedObserved.size === observedYs.length) {
+                    matches.push(t);
+                }
+            }
+
+            // Display Results
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = `<span class="error">No matching T values found within a 5000-step range.</span>`;
+                return;
+            }
+
+            let htmlOutput = `<h3>Found ${matches.length} Match(es):</h3>`;
+            
+            // For the first matching T found, generate its entire Y curve output
+            matches.forEach(t => {
+                htmlOutput += `<div class="match-card">
+                    <strong>👉 Match Found at t = ${t}</strong> (Distance from start: ${t - startT})
+                </div>`;
+            });
+
+            // Let's print out all the generated Y values for the *first* successful T as a sample/output
+            let targetT = matches[0];
+            htmlOutput += `<h4>Generated Y values for t = ${targetT}:</h4><textarea style="width:100%; height:200px; font-family:monospace;">`;
+            for (let x = 100; x <= 2200; x++) {
+                htmlOutput += `X=${x}: Y=${calculateY(targetT, x, norm600, norm1400).toFixed(2)}\n`;
+            }
+            htmlOutput += `</textarea>`;
+
+            resultsDiv.innerHTML = htmlOutput;
+        }
+    </script>
+</body>
+</html>
