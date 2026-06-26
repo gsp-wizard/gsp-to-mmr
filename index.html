@@ -124,6 +124,15 @@
             font-size: 0.9rem;
             line-height: 1.4;
         }
+
+        .version-badge {
+            display: block;
+            text-align: center;
+            margin-top: 50px;
+            font-size: 0.75rem;
+            color: #374151;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -141,30 +150,10 @@
 
     <div id="results"></div>
 
+    <div class="version-badge">App Version: 1.4.0</div>
+
     <script>
-        function erf(x) {
-            const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-            const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-            const sign = x < 0 ? -1 : 1;
-            const absX = Math.abs(x);
-            const t = 1.0 / (1.0 + p * absX);
-            const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
-            return sign * y;
-        }
-
-        function normCDF(x, mean, stdDev) {
-            return 0.5 * (1.0 + erf((x - mean) / (stdDev * Math.sqrt(2))));
-        }
-
-        function calculateGSP(t, mmr, norm600, norm1400) {
-            const baseVal = 1995587;
-            const tMod = Math.floor((t - 481) / 49);
-            
-            if (mmr <= 599) {
-                const gsp600 = baseVal + (16058300 + 100 * t - baseVal) * norm600;
-                const slopeB = 248.831 + tMod * 0.07619047619;
-                return gsp600 - (600 - mmr) * slopeB;
-            } else if (mmr >= 1401) {
-                const gsp1400 = baseVal + (16058300 + 100 * t - baseVal) * norm1400;
-                const slopeT = 220.605 + tMod * 0.0670995671;
-                return gsp1400 + (mmr - 1400) * slopeT;
+        function stdNormCDF(x) {
+            const t = 1 / (1 + 0.2316419 * Math.abs(x));
+            const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+            const p = d * t * (0.31938153 + t * (-0.356563782
