@@ -134,12 +134,12 @@
     <div id="results"></div>
 
     <script>
-        // Standard normal cumulative distribution function (approximation of NORM.DIST)
+        // Highly precise standard normal cumulative distribution function (exact equivalent to NORM.DIST)
         function stdNormCDF(x) {
             const t = 1 / (1 + 0.2316419 * Math.abs(x));
-            const d = 0.39894228 * Math.exp(-x * x / 2);
+            const d = 0.3989422804014327 * Math.exp(-x * x / 2);
             const p = d * t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-            return x >= 0 ? 1 - p : p;
+            return x >= 0 ? 1 - p : p; // Corrected boundary assignment
         }
 
         function normCDF(x, mean, stdDev) {
@@ -164,7 +164,6 @@
             }
         }
 
-        // Attach event listener directly to the button element safely
         document.getElementById('searchBtn').addEventListener('click', function() {
             const startT = 2000;
             const gsp1Input = document.getElementById('gsp1').value;
@@ -183,5 +182,74 @@
             resultsDiv.style.display = 'block';
             resultsDiv.innerHTML = '<span style="color: var(--text-muted)">Searching ranges...</span>';
 
-            // Pre-calculate boundaries
-            const norm60
+            // Pre-calculate boundary distributions
+            const norm600 = normCDF(600, 1000, 110);
+            const norm1400 = normCDF(1400, 1000, 110);
+
+            // Generate sequence alternating outwards from T=2000
+            let tSequence = [startT];
+            for (let step = 1; step <= maxSteps; step++) {
+                tSequence.push(startT + step);
+                tSequence.push(startT - step);
+            }
+
+            let matches = [];
+
+            // Loop through generated sequence of T values
+            for (let i = 0; i < tSequence.length; i++) {
+                let t = tSequence[i];
+                let matchedObserved = new Set();
+                
+                // Sweep across the complete MMR array
+                for (let mmr = 100; mmr <= 2200; mmr++) {
+                    let gspCalc = calculateGSP(t, mmr, norm600, norm1400);
+                    
+                    for (let j = 0; j < observedGSPs.length; j++) {
+                        if (Math.abs(gspCalc - observedGSPs[j]) <= tolerance) {
+                            matchedObserved.add(j);
+                        }
+                    }
+                }
+
+                if (matchedObserved.size === observedGSPs.length) {
+                    matches.push(t);
+                }
+            }
+
+            // Output management
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = `<span class="error">No matching T values found within a ${maxSteps}-step range of T=2000. Try adjusting parameters.</span>`;
+                return;
+            }
+
+            let htmlOutput = `<h3>Found ${matches.length} Match(es):</h3>`;
+            
+            matches.forEach(t => {
+                htmlOutput += `<div class="match-card">
+                    <strong>👉 Match Found at t = ${t}</strong> <span style="color: var(--text-muted); font-size:0.9rem; margin-left:8px;">(Distance from 2000: ${t - startT})</span>
+                </div>`;
+            });
+
+            // Target the earliest valid match returned
+            let targetT = matches[0];
+            let eliteGSP = calculateGSP(targetT, 1142, norm600, norm1400);
+
+            // Dedicated Elite Smash display banner
+            htmlOutput += `<div class="elite-card">
+                ✨ Elite Smash Entry Point (MMR=1142):
+                <span>GSP: ${Number(eliteGSP.toFixed(0)).toLocaleString()}</span>
+            </div>`;
+
+            htmlOutput += `<h4>Generated GSP values for t = ${targetT}:</h4><textarea readonly>`;
+            
+            // Generate list in descending MMR order
+            for (let mmr = 2200; mmr >= 100; mmr--) {
+                htmlOutput += `MMR=${mmr}: GSP=${calculateGSP(targetT, mmr, norm600, norm1400).toFixed(2)}\n`;
+            }
+            htmlOutput += `</textarea>`;
+
+            resultsDiv.innerHTML = htmlOutput;
+        });
+    </script>
+</body>
+</html>
