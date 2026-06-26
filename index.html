@@ -148,20 +148,20 @@
     <p>Enter <em>exact</em> current gsp values of two characters.</p>
 
     <label for="gsp1">Observed GSP 1:</label>
-    <input type="number" id="gsp1" value="16147639">
+    <input type="number" id="gsp1" value="15247277">
 
     <label for="gsp2">Observed GSP 2:</label>
-    <input type="number" id="gsp2" value="16216751">
+    <input type="number" id="gsp2" value="16107350">
 
     <label for="gsp3">Observed GSP 3 (Optional):</label>
-    <input type="number" id="gsp3" placeholder="e.g., 16250000">
+    <input type="number" id="gsp3" placeholder="e.g., 8813077">
     <div class="input-hint">Use a 3rd one if you find multiple matching curves.</div>
 
     <button type="button" id="searchBtn">Find Matching GSP Curve</button>
 
     <div id="results"></div>
 
-    <div class="version-badge">App Version: 1.6.0</div>
+    <div class="version-badge">App Version: 1.6.1</div>
 
     <script>
         function stdNormCDF(x) {
@@ -172,113 +172,4 @@
         }
 
         function normCDF(x, mean, stdDev) {
-            return stdNormCDF((x - mean) / stdDev);
-        }
-
-        function calculateGSP(t, mmr, norm600, norm1400) {
-            var baseVal = 1995587;
-            var tMod = Math.floor((t - 481) / 49);
-            
-            if (mmr <= 599) {
-                var gsp600 = baseVal + (16058300 + 100 * t - baseVal) * norm600;
-                var slopeB = 248.831 + tMod * 0.07619047619;
-                return gsp600 - (600 - mmr) * slopeB;
-            } else if (mmr >= 1401) {
-                var gsp1400 = baseVal + (16058300 + 100 * t - baseVal) * norm1400;
-                var slopeT = 220.605 + tMod * 0.0670995671;
-                return gsp1400 + (mmr - 1400) * slopeT;
-            } else {
-                var normDist = normCDF(mmr, 1000, 110);
-                return baseVal + (16058300 + 100 * t - baseVal) * normDist;
-            }
-        }
-
-        document.getElementById('searchBtn').addEventListener('click', function() {
-            var startT = 2000;
-            var gsp1Input = document.getElementById('gsp1').value;
-            var gsp2Input = document.getElementById('gsp2').value;
-            var gsp3Input = document.getElementById('gsp3').value;
-
-            if (!gsp1Input || !gsp2Input) {
-                alert("Please enter at least the first two GSP values.");
-                return;
-            }
-
-            // Build array based dynamically on whether the 3rd element was supplied
-            var observedGSPs = [parseFloat(gsp1Input), parseFloat(gsp2Input)];
-            var checkThird = false;
-            if (gsp3Input.trim() !== "") {
-                observedGSPs.push(parseFloat(gsp3Input));
-                checkThird = true;
-            }
-
-            var tolerance = 1.5; 
-            var maxSteps = 5000;
-
-            var resultsDiv = document.getElementById('results');
-            resultsDiv.style.display = 'block';
-
-            var norm600 = normCDF(600, 1000, 110);
-            var norm1400 = normCDF(1400, 1000, 110);
-
-            var tSequence = [startT];
-            for (var step = 1; step <= maxSteps; step++) {
-                tSequence.push(startT + step);
-                tSequence.push(startT - step);
-            }
-
-            var matches = [];
-
-            for (var i = 0; i < tSequence.length; i++) {
-                var t = tSequence[i];
-                var matchedObserved = new Set();
-                
-                for (var mmr = 100; mmr <= 2200; mmr++) {
-                    var gspCalc = calculateGSP(t, mmr, norm600, norm1400);
-                    
-                    var diff1 = Math.abs(gspCalc - observedGSPs[0]);
-                    var diff2 = Math.abs(gspCalc - observedGSPs[1]);
-
-                    if (diff1 <= tolerance) matchedObserved.add(0);
-                    if (diff2 <= tolerance) matchedObserved.add(1);
-
-                    if (checkThird) {
-                        var diff3 = Math.abs(gspCalc - observedGSPs[2]);
-                        if (diff3 <= tolerance) matchedObserved.add(2);
-                    }
-                }
-
-                if (matchedObserved.size === observedGSPs.length) {
-                    matches.push(t);
-                }
-            }
-
-            if (matches.length === 0) {
-                resultsDiv.innerHTML = '<span class="error">No matching curves found within range. Ensure values are exact.</span>';
-                return;
-            }
-
-            var htmlOutput = '<h3>Found ' + matches.length + ' Match(es):</h3>';
-            matches.forEach(function(t) {
-                htmlOutput += '<div class="match-card"><strong>👉 Match Found at t = ' + t + '</strong></div>';
-            });
-
-            var targetT = matches[0];
-            var eliteGSP = calculateGSP(targetT, 1142, norm600, norm1400);
-
-            htmlOutput += '<div class="elite-card">✨ Elite Smash Entry Point (MMR=1142):<span>GSP: ' + Number(eliteGSP.toFixed(0)).toLocaleString() + '</span></div>';
-            htmlOutput += '<h4>Generated GSP values for t = ' + targetT + ':</h4>';
-            htmlOutput += '<div class="disclaimer">*Actual GSP values will be ±1 of these numbers.</div>';
-            htmlOutput += '<textarea readonly>';
-            
-            for (var mmr = 2200; mmr >= 100; mmr--) {
-                var finalGSP = Math.round(calculateGSP(targetT, mmr, norm600, norm1400));
-                htmlOutput += 'MMR=' + mmr + ': GSP=' + finalGSP.toLocaleString() + '\n';
-            }
-            htmlOutput += '</textarea>';
-
-            resultsDiv.innerHTML = htmlOutput;
-        });
-    </script>
-</body>
-</html>
+            return std
