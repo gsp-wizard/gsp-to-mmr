@@ -134,16 +134,19 @@
     <div id="results"></div>
 
     <script>
-        // Highly precise standard normal cumulative distribution function (exact equivalent to NORM.DIST)
-        function stdNormCDF(x) {
-            const t = 1 / (1 + 0.2316419 * Math.abs(x));
-            const d = 0.3989422804014327 * Math.exp(-x * x / 2);
-            const p = d * t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-            return x >= 0 ? 1 - p : p; // Corrected boundary assignment
+        // High-precision error function calculation for exact normal distributions
+        function erf(x) {
+            const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+            const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+            const sign = x < 0 ? -1 : 1;
+            const absX = Math.abs(x);
+            const t = 1.0 / (1.0 + p * absX);
+            const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
+            return sign * y;
         }
 
         function normCDF(x, mean, stdDev) {
-            return stdNormCDF((x - mean) / stdDev);
+            return 0.5 * (1.0 + erf((x - mean) / (stdDev * Math.sqrt(2))));
         }
 
         function calculateGSP(t, mmr, norm600, norm1400) {
@@ -165,6 +168,9 @@
         }
 
         document.getElementById('searchBtn').addEventListener('click', function() {
+            console.clear();
+            console.log("🚀 Initialization starting...");
+            
             const startT = 2000;
             const gsp1Input = document.getElementById('gsp1').value;
             const gsp2Input = document.getElementById('gsp2').value;
@@ -175,80 +181,96 @@
             }
 
             const observedGSPs = [parseFloat(gsp1Input), parseFloat(gsp2Input)];
-            const tolerance = 1.5;
+            const tolerance = 1.5; 
             const maxSteps = 5000;
+
+            console.log("Parameters Captured -> Targets:", observedGSPs, "Tolerance:", tolerance);
 
             const resultsDiv = document.getElementById('results');
             resultsDiv.style.display = 'block';
-            resultsDiv.innerHTML = '<span style="color: var(--text-muted)">Searching ranges...</span>';
+            resultsDiv.innerHTML = '<span style="color: var(--text-muted)">Scanning 10,000 curves... Check dev console for diagnostics.</span>';
 
-            // Pre-calculate boundary distributions
-            const norm600 = normCDF(600, 1000, 110);
-            const norm1400 = normCDF(1400, 1000, 110);
+            setTimeout(() => {
+                const norm600 = normCDF(600, 1000, 110);
+                const norm1400 = normCDF(1400, 1000, 110);
+                console.log(`Pre-calculated CDF Anchors -> norm600: ${norm600.toFixed(6)}, norm1400: ${norm1400.toFixed(6)}`);
 
-            // Generate sequence alternating outwards from T=2000
-            let tSequence = [startT];
-            for (let step = 1; step <= maxSteps; step++) {
-                tSequence.push(startT + step);
-                tSequence.push(startT - step);
-            }
+                let tSequence = [startT];
+                for (let step = 1; step <= maxSteps; step++) {
+                    tSequence.push(startT + step);
+                    tSequence.push(startT - step);
+                }
 
-            let matches = [];
+                let matches = [];
+                let minObservedDiff1 = Infinity;
+                let minObservedDiff2 = Infinity;
+                let bestTForGSP1 = null;
+                let bestTForGSP2 = null;
 
-            // Loop through generated sequence of T values
-            for (let i = 0; i < tSequence.length; i++) {
-                let t = tSequence[i];
-                let matchedObserved = new Set();
-                
-                // Sweep across the complete MMR array
-                for (let mmr = 100; mmr <= 2200; mmr++) {
-                    let gspCalc = calculateGSP(t, mmr, norm600, norm1400);
+                console.log(`Starting loop execution over ${tSequence.length} values of T...`);
+
+                for (let i = 0; i < tSequence.length; i++) {
+                    let t = tSequence[i];
+                    let matchedObserved = new Set();
                     
-                    for (let j = 0; j < observedGSPs.length; j++) {
-                        if (Math.abs(gspCalc - observedGSPs[j]) <= tolerance) {
-                            matchedObserved.add(j);
-                        }
+                    // Diagnostic dump for the original starting position
+                    if (i === 0) {
+                        console.log(`Sample Calculation at T = 2000:`);
+                        console.log(`  -> GSP at MMR=600: ${calculateGSP(t, 600, norm600, norm1400)}`);
+                        console.log(`  -> GSP at MMR=1000: ${calculateGSP(t, 1000, norm600, norm1400)}`);
+                        console.log(`  -> GSP at MMR=1400: ${calculateGSP(t, 1400, norm600, norm1400)}`);
+                    }
+                    
+                    for (let mmr = 100; mmr <= 2200; mmr++) {
+                        let gspCalc = calculateGSP(t, mmr, norm600, norm1400);
+                        
+                        let diff1 = Math.abs(gspCalc - observedGSPs[0]);
+                        let diff2 = Math.abs(gspCalc - observedGSPs[1]);
+
+                        if (diff1 < minObservedDiff1) { minObservedDiff1 = diff1; bestTForGSP1 = t; }
+                        if (diff2 < minObservedDiff2) { minObservedDiff2 = diff2; bestTForGSP2 = t; }
+
+                        if (diff1 <= tolerance) matchedObserved.add(0);
+                        if (diff2 <= tolerance) matchedObserved.add(1);
+                    }
+
+                    if (matchedObserved.size === observedGSPs.length) {
+                        matches.push(t);
                     }
                 }
 
-                if (matchedObserved.size === observedGSPs.length) {
-                    matches.push(t);
+                console.log("🏁 Search concluded.");
+                console.log(`Closest single approach to Target GSP 1 (${observedGSPs[0]}): Missed by ${minObservedDiff1.toFixed(4)} at T=${bestTForGSP1}`);
+                console.log(`Closest single approach to Target GSP 2 (${observedGSPs[1]}): Missed by ${minObservedDiff2.toFixed(4)} at T=${bestTForGSP2}`);
+
+                if (matches.length === 0) {
+                    resultsDiv.innerHTML = `<span class="error">No matching curves found within range. Check your browser console (F12) for detailed data.</span>`;
+                    return;
                 }
-            }
 
-            // Output management
-            if (matches.length === 0) {
-                resultsDiv.innerHTML = `<span class="error">No matching T values found within a ${maxSteps}-step range of T=2000. Try adjusting parameters.</span>`;
-                return;
-            }
+                let htmlOutput = `<h3>Found ${matches.length} Match(es):</h3>`;
+                matches.forEach(t => {
+                    htmlOutput += `<div class="match-card">
+                        <strong>👉 Match Found at t = ${t}</strong> <span style="color: var(--text-muted); font-size:0.9rem; margin-left:8px;">(Distance from 2000: ${t - startT})</span>
+                    </div>`;
+                });
 
-            let htmlOutput = `<h3>Found ${matches.length} Match(es):</h3>`;
-            
-            matches.forEach(t => {
-                htmlOutput += `<div class="match-card">
-                    <strong>👉 Match Found at t = ${t}</strong> <span style="color: var(--text-muted); font-size:0.9rem; margin-left:8px;">(Distance from 2000: ${t - startT})</span>
+                let targetT = matches[0];
+                let eliteGSP = calculateGSP(targetT, 1142, norm600, norm1400);
+
+                htmlOutput += `<div class="elite-card">
+                    ✨ Elite Smash Entry Point (MMR=1142):
+                    <span>GSP: ${Number(eliteGSP.toFixed(0)).toLocaleString()}</span>
                 </div>`;
-            });
 
-            // Target the earliest valid match returned
-            let targetT = matches[0];
-            let eliteGSP = calculateGSP(targetT, 1142, norm600, norm1400);
+                htmlOutput += `<h4>Generated GSP values for t = ${targetT}:</h4><textarea readonly>`;
+                for (let mmr = 2200; mmr >= 100; mmr--) {
+                    htmlOutput += `MMR=${mmr}: GSP=${calculateGSP(targetT, mmr, norm600, norm1400).toFixed(2)}\n`;
+                }
+                htmlOutput += `</textarea>`;
 
-            // Dedicated Elite Smash display banner
-            htmlOutput += `<div class="elite-card">
-                ✨ Elite Smash Entry Point (MMR=1142):
-                <span>GSP: ${Number(eliteGSP.toFixed(0)).toLocaleString()}</span>
-            </div>`;
-
-            htmlOutput += `<h4>Generated GSP values for t = ${targetT}:</h4><textarea readonly>`;
-            
-            // Generate list in descending MMR order
-            for (let mmr = 2200; mmr >= 100; mmr--) {
-                htmlOutput += `MMR=${mmr}: GSP=${calculateGSP(targetT, mmr, norm600, norm1400).toFixed(2)}\n`;
-            }
-            htmlOutput += `</textarea>`;
-
-            resultsDiv.innerHTML = htmlOutput;
+                resultsDiv.innerHTML = htmlOutput;
+            }, 50);
         });
     </script>
 </body>
