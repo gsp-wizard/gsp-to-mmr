@@ -117,21 +117,6 @@
             line-height: 1.4;
         }
     </style>
-</head>
-<body>
-
-    <h2>GSP to MMR</h2>
-    <p>Enter your observed GSP parameters to scan the curves from a base T of 2000.</p>
-
-    <label for="gsp1">Observed GSP 1:</label>
-    <input type="number" id="gsp1" value="16147639">
-
-    <label for="gsp2">Observed GSP 2:</label>
-    <input type="number" id="gsp2" value="16216751">
-
-    <button type="button" onclick="runSearch()">Find T and Calculate Curve</button>
-
-    <div id="results"></div>
 
     <script>
         // Standard normal cumulative distribution function (approximation of NORM.DIST)
@@ -164,4 +149,72 @@
             }
         }
 
-        function runSearch()
+        // Securely bind runSearch globally so HTML elements can read it instantly
+        window.runSearch = function() {
+            const startT = 2000;
+            const gsp1Input = document.getElementById('gsp1').value;
+            const gsp2Input = document.getElementById('gsp2').value;
+
+            if (!gsp1Input || !gsp2Input) {
+                alert("Please enter both GSP values.");
+                return;
+            }
+
+            const observedGSPs = [parseFloat(gsp1Input), parseFloat(gsp2Input)];
+            const tolerance = 1.5;
+            const maxSteps = 5000;
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<span style="color: var(--text-muted)">Searching ranges...</span>';
+
+            // Pre-calculate boundaries
+            const norm600 = normCDF(600, 1000, 110);
+            const norm1400 = normCDF(1400, 1000, 110);
+
+            // Generate inward-out T sequence
+            let tSequence = [startT];
+            for (let step = 1; step <= maxSteps; step++) {
+                tSequence.push(startT + step);
+                tSequence.push(startT - step);
+            }
+
+            let matches = [];
+
+            // Loop through T values
+            for (let i = 0; i < tSequence.length; i++) {
+                let t = tSequence[i];
+                let matchedObserved = new Set();
+                
+                // Scan MMR from 100 to 2200
+                for (let mmr = 100; mmr <= 2200; mmr++) {
+                    let gspCalc = calculateGSP(t, mmr, norm600, norm1400);
+                    
+                    for (let j = 0; j < observedGSPs.length; j++) {
+                        if (Math.abs(gspCalc - observedGSPs[j]) <= tolerance) {
+                            matchedObserved.add(j);
+                        }
+                    }
+                }
+
+                if (matchedObserved.size === observedGSPs.length) {
+                    matches.push(t);
+                }
+            }
+
+            // Display Results
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = `<span class="error">No matching T values found within a ${maxSteps}-step range of T=2000.</span>`;
+                return;
+            }
+
+            let htmlOutput = `<h3>Found ${matches.length} Match(es):</h3>`;
+            
+            matches.forEach(t => {
+                htmlOutput += `<div class="match-card">
+                    <strong>👉 Match Found at t = ${t}</strong> <span style="color: var(--text-muted); font-size:0.9rem; margin-left:8px;">(Distance from 2000: ${t - startT})</span>
+                </div>`;
+            });
+
+            // Calculate Elite Smash threshold and list output for the first matching T value
+            let targetT =
