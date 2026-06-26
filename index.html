@@ -17,6 +17,7 @@
             --error: #ef4444;
             --border: #374151;
             --elite-gold: #fbbf24;
+            --highlight-blue: #60a5fa;
         }
 
         body { 
@@ -56,6 +57,7 @@
             color: var(--text-muted);
             margin-top: 4px;
             font-style: italic;
+            line-height: 1.4;
         }
 
         button { 
@@ -103,7 +105,7 @@
         .elite-card {
             border-left: 4px solid var(--elite-gold);
             padding: 12px 15px;
-            margin: 20px 0;
+            margin: 15px 0;
             background: #2e2516;
             border-radius: 0 8px 8px 0;
             font-weight: 600;
@@ -113,6 +115,26 @@
             font-size: 1.15rem;
             display: block;
             margin-top: 2px;
+        }
+
+        .highlight-card {
+            border-left: 4px solid var(--highlight-blue);
+            padding: 12px 15px;
+            margin: 15px 0;
+            background: #1c2536;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-card h4 {
+            color: var(--highlight-blue);
+            margin-bottom: 6px;
+        }
+        .highlight-item {
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+            font-family: monospace;
+        }
+        .highlight-item:last-child {
+            margin-bottom: 0;
         }
 
         .error { color: var(--error); font-weight: 600; }
@@ -161,7 +183,7 @@
 
     <div id="results"></div>
 
-    <div class="version-badge">App Version: 1.6.3</div>
+    <div class="version-badge">App Version: 1.7.1</div>
 
     <script>
         function stdNormCDF(x) {
@@ -231,18 +253,17 @@
             }
 
             var matches = [];
+            var matchedMMRMapping = {}; 
             var currentIndex = 0;
-            var chunkCount = 200; // Breaks calculations down to prevent processing thread blockages
-
-            console.log("Generated calculation queue size:", tSequence.length);
+            var chunkCount = 200; 
 
             function processChunk() {
                 var endIndex = Math.min(currentIndex + chunkCount, tSequence.length);
-                console.log("Analyzing index slice: " + currentIndex + " to " + endIndex);
 
                 for (var i = currentIndex; i < endIndex; i++) {
                     var t = tSequence[i];
                     var matchedObserved = new Set();
+                    var localMmrMap = {};
                     
                     for (var mmr = 100; mmr <= 2200; mmr++) {
                         var gspCalc = calculateGSP(t, mmr, norm600, norm1400);
@@ -250,28 +271,37 @@
                         var diff1 = Math.abs(gspCalc - observedGSPs[0]);
                         var diff2 = Math.abs(gspCalc - observedGSPs[1]);
 
-                        if (diff1 <= tolerance) matchedObserved.add(0);
-                        if (diff2 <= tolerance) matchedObserved.add(1);
+                        if (diff1 <= tolerance) {
+                            matchedObserved.add(0);
+                            localMmrMap[observedGSPs[0]] = mmr;
+                        }
+                        if (diff2 <= tolerance) {
+                            matchedObserved.add(1);
+                            localMmrMap[observedGSPs[1]] = mmr;
+                        }
 
                         if (checkThird) {
                             var diff3 = Math.abs(gspCalc - observedGSPs[2]);
-                            if (diff3 <= tolerance) matchedObserved.add(2);
+                            if (diff3 <= tolerance) {
+                                matchedObserved.add(2);
+                                localMmrMap[observedGSPs[2]] = mmr;
+                            }
                         }
                     }
 
                     if (matchedObserved.size === observedGSPs.length) {
-                        console.log("🎯 Valid match hit discovered at T =", t);
                         matches.push(t);
+                        if (matches.length === 1) {
+                            matchedMMRMapping = localMmrMap;
+                        }
                     }
                 }
 
                 currentIndex = endIndex;
 
                 if (currentIndex < tSequence.length) {
-                    // Schedules next slice without halting UI rendering thread
                     requestAnimationFrame(processChunk);
                 } else {
-                    console.log("🏁 All curves searched. Total matching engines found:", matches.length);
                     renderFinalResults();
                 }
             }
@@ -290,6 +320,14 @@
                 var targetT = matches[0];
                 var eliteGSP = calculateGSP(targetT, 1142, norm600, norm1400);
 
+                htmlOutput += '<div class="highlight-card">';
+                htmlOutput += '<h4>🔍 Your Entered GSP Mappings:</h4>';
+                observedGSPs.forEach(function(gsp) {
+                    var mmrVal = matchedMMRMapping[gsp] !== undefined ? matchedMMRMapping[gsp] : "Not found";
+                    htmlOutput += '<div class="highlight-item"><b>GSP ' + gsp.toLocaleString() + '</b> ➔ MMR ' + mmrVal + '</div>';
+                });
+                htmlOutput += '</div>';
+
                 htmlOutput += '<div class="elite-card">✨ Elite Smash Entry Point (MMR=1142):<span>GSP: ' + Number(eliteGSP.toFixed(0)).toLocaleString() + '</span></div>';
                 htmlOutput += '<h4>Generated GSP values for t = ' + targetT + ':</h4>';
                 htmlOutput += '<div class="disclaimer">*Actual GSP values will be ±1 of these numbers.</div>';
@@ -304,7 +342,6 @@
                 resultsDiv.innerHTML = htmlOutput;
             }
 
-            // Fire off background thread loop execution
             requestAnimationFrame(processChunk);
         });
     </script>
