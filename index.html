@@ -183,7 +183,7 @@
 
     <div id="results"></div>
 
-    <div class="version-badge">App Version: 1.7.1</div>
+    <div class="version-badge">App Version: 1.7.2</div>
 
     <script>
         function stdNormCDF(x) {
@@ -207,7 +207,7 @@
                 return gsp600 - (600 - mmr) * slopeB;
             } else if (mmr >= 1401) {
                 var gsp1400 = baseVal + (16058300 + 100 * t - baseVal) * norm1400;
-                var slopeT = 220.605 + tMod * 0.0670995671;
+                var slopeT = 220.60524 + tMod * 0.0671156;
                 return gsp1400 + (mmr - 1400) * slopeT;
             } else {
                 var normDist = normCDF(mmr, 1000, 110);
